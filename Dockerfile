@@ -40,7 +40,7 @@ FROM ruby:2.5.1-alpine
 
 # Set a variable for the install location.
 ARG RAILS_ROOT=/usr/src/app
-ARG PACKAGES="tzdata curl postgresql-client sqlite-libs yarn nodejs bash"
+ARG PACKAGES="tzdata curl postgresql-client sqlite-libs yarn nodejs bash ca-certificates"
 
 ENV RAILS_ENV=production
 ENV BUNDLE_APP_CONFIG="$RAILS_ROOT/.bundle"
@@ -49,8 +49,8 @@ WORKDIR $RAILS_ROOT
 
 RUN apk update \
     && apk upgrade \
-    && apk add --update --no-cache $PACKAGES
-
+    && apk add --update --no-cache $PACKAGES \
+    && chmod -R g=u /etc/ssl
 
 COPY --from=base $RAILS_ROOT $RAILS_ROOT
 
