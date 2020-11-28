@@ -33,7 +33,8 @@ Rails.application.config.omniauth_openid_connect = ENV['OPENID_CONNECT_CLIENT_ID
                                                    ENV['OPENID_CONNECT_CLIENT_SECRET'].present? &&
                                                    ENV['OPENID_CONNECT_ISSUER'].present?
 Rails.application.config.omniauth_saml = ENV['SAML_ISSUER'].present? && ENV['SAML_IDP_URL'].present? &&
-                                         ENV['SAML_IDP_CERT_FINGERPRINT'].present?
+                                         (ENV['SAML_IDP_CERT_FINGERPRINT'].present? ||
+                                          ENV['SAML_IDP_CERT_PATH'].present?)
 
 SETUP_PROC = lambda do |env|
   env['omniauth.strategy'].options[:client_options][:redirect_uri] ||=
@@ -58,13 +59,30 @@ Rails.application.config.middleware.use OmniAuth::Builder do
 
       provider :twitter, ENV['TWITTER_ID'], ENV['TWITTER_SECRET']
     end
-    if Rails.configuration.omniauth_saml
+    if Rails.configuration.omniauth_saml && ENV['SAML_IDP_CERT_FINGERPRINT'].present?
       Rails.application.config.providers << :saml
 
       provider :saml,
         issuer: ENV['SAML_ISSUER'],
         idp_sso_target_url: ENV['SAML_IDP_URL'],
         idp_cert_fingerprint: ENV['SAML_IDP_CERT_FINGERPRINT'],
+        name_identifier_format: ENV['SAML_NAME_IDENTIFIER'],
+        attribute_statements: {
+          nickname: [ENV['SAML_USERNAME_ATTRIBUTE'] || 'urn:mace:dir:attribute-def:eduPersonPrincipalName'],
+          email: [ENV['SAML_EMAIL_ATTRIBUTE'] || 'urn:mace:dir:attribute-def:mail'],
+          name: [ENV['SAML_COMMONNAME_ATTRIBUTE'] || 'urn:mace:dir:attribute-def:cn']
+        },
+        uid_attribute: ENV['SAML_UID_ATTRIBUTE']
+    elsif Rails.configuration.omniauth_saml
+      pem_file = File.open(ENV['SAML_IDP_CERT_PATH'])
+      pem_data = pem_file.read
+      pem_file.close
+      Rails.application.config.providers << :saml
+
+      provider :saml,
+        issuer: ENV['SAML_ISSUER'],
+        idp_sso_target_url: ENV['SAML_IDP_URL'],
+	idp_cert: pem_data,
         name_identifier_format: ENV['SAML_NAME_IDENTIFIER'],
         attribute_statements: {
           nickname: [ENV['SAML_USERNAME_ATTRIBUTE'] || 'urn:mace:dir:attribute-def:eduPersonPrincipalName'],
@@ -232,14 +250,29 @@ Rails.application.config.middleware.use OmniAuth::Builder do
 
       uri = URI(ENV['OPENID_CONNECT_SITE'].present? ? ENV['OPENID_CONNECT_SITE'] : '')
 
-      client_options = {
-        identifier: ENV['OPENID_CONNECT_CLIENT_ID'],
-        secret: ENV['OPENID_CONNECT_CLIENT_SECRET'],
-        redirect_uri: redirect,
-        scheme: uri.scheme,
-        host: uri.host,
-        port: uri.port
-      }.compact
+
+      if ENV['OPENID_CONNECT_CA_FILE'].present?
+        client_options = {
+          identifier: ENV['OPENID_CONNECT_CLIENT_ID'],
+          secret: ENV['OPENID_CONNECT_CLIENT_SECRET'],
+          redirect_uri: redirect,
+          scheme: uri.scheme,
+          host: uri.host,
+          port: uri.port,
+          ssl: {
+            ca_file: ENV['OPENID_CONNECT_CA_FILE']
+          }
+        }.compact
+      else
+          client_options = {
+          identifier: ENV['OPENID_CONNECT_CLIENT_ID'],
+          secret: ENV['OPENID_CONNECT_CLIENT_SECRET'],
+          redirect_uri: redirect,
+          scheme: uri.scheme,
+          host: uri.host,
+          port: uri.port
+        }.compact
+      end
 
       {
         authorization_endpoint: 'OPENID_CONNECT_AUTHORIZATION_ENDPOINT',
