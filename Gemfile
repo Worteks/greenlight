@@ -48,6 +48,7 @@ gem 'sprockets', '< 4.0.0'
 
 # Authentication.
 gem 'omniauth'
+gem 'omniauth-saml'
 gem 'omniauth-twitter'
 gem 'omniauth-google-oauth2'
 gem 'omniauth_openid_connect'

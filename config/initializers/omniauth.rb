@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-require 'office365'
+require 'jwt'
+require 'uri'
 require 'omniauth_options'
 
 include OmniauthOptions
@@ -19,8 +20,12 @@ Rails.application.config.omniauth_office365 = ENV['OFFICE365_KEY'].present? &&
 Rails.application.config.omniauth_openid_connect = ENV['OPENID_CONNECT_CLIENT_ID'].present? &&
                                                    ENV['OPENID_CONNECT_CLIENT_SECRET'].present? &&
                                                    ENV['OPENID_CONNECT_ISSUER'].present?
+Rails.application.config.omniauth_saml = ENV['SAML_ISSUER'].present? && ENV['SAML_IDP_URL'].present? &&
+                                         ENV['SAML_IDP_CERT_FINGERPRINT'].present?
 
 SETUP_PROC = lambda do |env|
+  env['omniauth.strategy'].options[:client_options][:redirect_uri] ||=
+    (env['omniauth.strategy'].full_host + env['omniauth.strategy'].script_name + env['omniauth.strategy'].callback_path)
   OmniauthOptions.omniauth_options env
 end
 
@@ -41,22 +46,43 @@ Rails.application.config.middleware.use OmniAuth::Builder do
 
       provider :twitter, ENV['TWITTER_ID'], ENV['TWITTER_SECRET']
     end
+    if Rails.configuration.omniauth_saml
+      Rails.application.config.providers << :saml
+
+      provider :saml,
+        issuer: ENV['SAML_ISSUER'],
+        idp_sso_target_url: ENV['SAML_IDP_URL'],
+        idp_cert_fingerprint: ENV['SAML_IDP_CERT_FINGERPRINT'],
+        name_identifier_format: ENV['SAML_NAME_IDENTIFIER'],
+        attribute_statements: {
+          nickname: [ENV['SAML_USERNAME_ATTRIBUTE'] || 'urn:mace:dir:attribute-def:eduPersonPrincipalName'],
+          email: [ENV['SAML_EMAIL_ATTRIBUTE'] || 'urn:mace:dir:attribute-def:mail'],
+          name: [ENV['SAML_COMMONNAME_ATTRIBUTE'] || 'urn:mace:dir:attribute-def:cn']
+        },
+        uid_attribute: ENV['SAML_UID_ATTRIBUTE']
+    end
     if Rails.configuration.omniauth_google
       Rails.application.config.providers << :google
 
-      redirect = ENV['OAUTH2_REDIRECT'].present? ? File.join(ENV['OAUTH2_REDIRECT'], "auth", "google", "callback") : nil
+      redirect = ENV['OAUTH2_REDIRECT'].present? ? File.join(ENV['OAUTH2_REDIRECT'], 'auth', 'google', 'callback') : nil
 
-      provider :google_oauth2, ENV['GOOGLE_OAUTH2_ID'], ENV['GOOGLE_OAUTH2_SECRET'],
-        scope: %w(profile email),
-        access_type: 'online',
-        name: 'google',
-        redirect_uri: redirect,
-        setup: SETUP_PROC
+      provider :openid_connect,
+               name: :google,
+               issuer: 'https://accounts.google.com',
+               discovery: true,
+               scope: [:openid, :email, :profile],
+               response_type: :code,
+               client_options: {
+                 identifier: ENV['GOOGLE_OAUTH2_ID'],
+                 secret: ENV['GOOGLE_OAUTH2_SECRET'],
+                 redirect_uri: redirect
+               },
+               setup: SETUP_PROC
     end
     if Rails.configuration.omniauth_office365
       Rails.application.config.providers << :office365
 
-      redirect = ENV['OAUTH2_REDIRECT'].present? ? File.join(ENV['OAUTH2_REDIRECT'], "auth", "office365", "callback") : nil
+      redirect = ENV['OAUTH2_REDIRECT'].present? ? File.join(ENV['OAUTH2_REDIRECT'], 'auth', 'office365', 'callback') : nil
 
       provider :office365, ENV['OFFICE365_KEY'], ENV['OFFICE365_SECRET'],
         redirect_uri: redirect,
