@@ -26,11 +26,6 @@ module ApplicationHelper
                                         :twitter,
                                         :office365,
                                         :saml,
-                                        :apple,
-                                        :facebook,
-                                        :github,
-                                        :instagram,
-                                        :linkedin,
                                         :openid_connect,
                                         :ldap]
 
@@ -144,5 +139,11 @@ module ApplicationHelper
   # Hide the signin buttons if there is an error on the page
   def show_signin
     !@hide_signin.present?
+  end
+
+  # Returns a more friendly/readable date time object
+  def view_date(date)
+    return "" if date.nil? # Handle invalid dates
+    local_time(date, "%b %d, %Y %-I:%M%P")
   end
 end

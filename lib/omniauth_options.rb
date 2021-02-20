@@ -43,6 +43,12 @@ module OmniauthOptions
       # This is only used in the old launcher and should eventually be removed
       env['omniauth.strategy'].options[:checksum] = generate_checksum(user_domain, customer_redirect_url,
         Rails.configuration.launcher_secret)
+    elsif env['omniauth.strategy'].options[:name] == "google"
+      set_hd(env, ENV['GOOGLE_OAUTH2_HD'])
+    elsif env['omniauth.strategy'].options[:name] == "office365"
+      set_hd(env, ENV['OFFICE365_HD'])
+    elsif env['omniauth.strategy'].options[:name] == "openid_connect"
+      set_hd(env, ENV['OPENID_CONNECT_HD'])
     elsif !env_hd.nil?
       set_hd(env, ENV[env_hd])
     end
