@@ -92,19 +92,31 @@ Rails.application.config.middleware.use OmniAuth::Builder do
       Rails.application.config.providers << :openid_connect
 
       redirect = ENV['OAUTH2_REDIRECT'].present? ? File.join(ENV['OAUTH2_REDIRECT'], "auth", "openid_connect", "callback") : nil
+      uri = URI(ENV['OPENID_CONNECT_SITE'].present? ? ENV['OPENID_CONNECT_SITE'] : '')
+      client_options = {
+        identifier: ENV['OPENID_CONNECT_CLIENT_ID'],
+        secret: ENV['OPENID_CONNECT_CLIENT_SECRET'],
+        redirect_uri: redirect,
+        scheme: uri.scheme,
+        host: uri.host,
+        port: uri.port
+      }.compact
+
+      {
+        authorization_endpoint: 'OPENID_CONNECT_AUTHORIZATION_ENDPOINT',
+        token_endpoint: 'OPENID_CONNECT_TOKEN_ENDPOINT',
+        end_session_endpoint: 'OPENID_CONNECT_END_SESSION_ENDPOINT'
+      }.each { |key, value| client_options[key] = ENV[value] if ENV[value].present? }
 
       provider :openid_connect,
-        issuer: ENV["OPENID_CONNECT_ISSUER"],
-        discovery: true,
-        scope: [:email, :profile],
-        response_type: :code,
-        uid_field: ENV["OPENID_CONNECT_UID_FIELD"] || "preferred_username",
-        client_options: {
-          identifier: ENV['OPENID_CONNECT_CLIENT_ID'],
-          secret: ENV['OPENID_CONNECT_CLIENT_SECRET'],
-          redirect_uri: redirect
-        },
-        setup: SETUP_PROC
+               name: :openid_connect,
+               issuer: ENV['OPENID_CONNECT_ISSUER'],
+               discovery: !(ENV['OPENID_CONNECT_DISCOVERY'].present? && ENV['OPENID_CONNECT_DISCOVERY'] == 'false'),
+               scope: [:openid, :email, :profile],
+               response_type: :code,
+               uid_field: ENV['OPENID_CONNECT_UID_FIELD'].present? ? ENV['OPENID_CONNECT_UID_FIELD'] : 'sub',
+               client_options: client_options,
+               setup: SETUP_PROC
     end
   end
 end
