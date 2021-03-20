@@ -22,13 +22,7 @@ require 'uri'
 module ApplicationHelper
   # Determines which providers can show a login button in the login modal.
   def iconset_providers
-    providers = configured_providers & [:google,
-                                        :twitter,
-                                        :office365,
-                                        :saml,
-                                        :openid_connect,
-                                        :ldap]
-
+    providers = configured_providers & [:google, :twitter, :office365, :openid_connect, :saml, :ldap]
     providers.delete(:twitter) if session[:old_twitter_user_id]
 
     providers
@@ -80,13 +74,14 @@ module ApplicationHelper
   end
 
   def translated_role_name(role)
-    if role.name == "denied"
+    case role.name
+    when "denied"
       I18n.t("roles.banned")
-    elsif role.name == "pending"
+    when "pending"
       I18n.t("roles.pending")
-    elsif role.name == "admin"
+    when "admin"
       I18n.t("roles.admin")
-    elsif role.name == "user"
+    when "user"
       I18n.t("roles.user")
     else
       role.name
@@ -114,6 +109,8 @@ module ApplicationHelper
     # Make a GET request and validate content type
     http = Net::HTTP.new(url.host, url.port)
     http.use_ssl = (url.scheme == "https")
+    http.read_timeout = 10
+    http.open_timeout = 10
 
     http.start do |web|
       response = web.head(url.request_uri)
