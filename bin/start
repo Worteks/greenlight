@@ -4,7 +4,7 @@ if ls /usr/local/share/ca-certificates/*.crt >/dev/null 2>&1; then
     update-ca-certificates
 fi
 if [ "$RAILS_ENV" = "production" ] && [ "$DB_ADAPTER" = "postgresql" ]; then
-  while ! curl http://$DB_HOST:${DB_PORT:-5432}/ 2>&1 | grep '52'
+  while ! curl http://$DB_HOST:${DB_PORT:-5432}/ 2>&1 | grep '52' >/dev/null
   do
     echo "Waiting for postgres to start up ..."
     sleep 1
